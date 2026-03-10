@@ -43,6 +43,8 @@ interface Store {
   // Редактор графа
   editMode: boolean
   setEditMode: (v: boolean) => void
+  editSubmode: 'move' | 'add' | 'del' | 'deledge'
+  setEditSubmode: (m: 'move' | 'add' | 'del' | 'deledge') => void
 
   // Активная вкладка
   activeTab: 'layers' | 'route' | 'object'
@@ -90,6 +92,8 @@ export const useStore = create<Store>((set, _get) => ({
 
   editMode: false,
   setEditMode: (v) => set({ editMode: v }),
+  editSubmode: 'add',
+  setEditSubmode: (m) => set({ editSubmode: m }),
 
   activeTab: 'layers',
   setActiveTab: (t) => set({ activeTab: t }),

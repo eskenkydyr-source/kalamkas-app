@@ -1,6 +1,101 @@
 import { useStore } from '../../store/useStore'
 import type { WellType } from '../../store/useStore'
 
+const SUBMODES = [
+  { key: 'add'     as const, icon: '➕', label: 'Добавить узел', hint: 'Клик на карте — добавить узел дороги' },
+  { key: 'move'    as const, icon: '✋', label: 'Перемещение',   hint: 'Перетащите узел на новое место' },
+  { key: 'del'     as const, icon: '🗑', label: 'Удалить узел',  hint: 'Клик на узле — удалить его' },
+  { key: 'deledge' as const, icon: '✂️', label: 'Удалить ребро', hint: 'Клик на дороге — удалить связь' },
+]
+
+function EditorTools() {
+  const { editSubmode, setEditSubmode } = useStore()
+
+  const exportGraph = () => {
+    const data = (window as any).__KALAMKAS_GRAPH
+    if (!data) return alert('Граф не загружен')
+    const json = JSON.stringify(data, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `graph_${new Date().toISOString().slice(0,10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const resetGraph = () => {
+    if (confirm('Сбросить все изменения графа?')) {
+      localStorage.removeItem('kalamkas_graph')
+      window.location.reload()
+    }
+  }
+
+  const activeHint = SUBMODES.find(s => s.key === editSubmode)?.hint
+
+  return (
+    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: 1 }}>
+        Инструменты
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+        {SUBMODES.map(s => (
+          <button
+            key={s.key}
+            onClick={() => setEditSubmode(s.key)}
+            title={s.hint}
+            style={{
+              padding: '7px 4px', fontSize: 11,
+              background: editSubmode === s.key ? '#4f46e5' : '#1e293b',
+              color: editSubmode === s.key ? '#fff' : '#94a3b8',
+              border: '1px solid ' + (editSubmode === s.key ? '#6366f1' : '#334155'),
+              borderRadius: 6, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4
+            }}
+          >
+            <span>{s.icon}</span>
+            <span>{s.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {activeHint && (
+        <div style={{
+          background: '#1e293b', border: '1px solid #334155',
+          borderRadius: 6, padding: '6px 8px',
+          fontSize: 11, color: '#94a3b8', lineHeight: 1.4
+        }}>
+          💡 {activeHint}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+        <button
+          onClick={exportGraph}
+          style={{
+            flex: 1, padding: '6px', fontSize: 11,
+            background: '#064e3b', color: '#6ee7b7',
+            border: '1px solid #065f46', borderRadius: 6, cursor: 'pointer'
+          }}
+        >
+          💾 Экспорт JSON
+        </button>
+        <button
+          onClick={resetGraph}
+          style={{
+            flex: 1, padding: '6px', fontSize: 11,
+            background: '#450a0a', color: '#fca5a5',
+            border: '1px solid #7f1d1d', borderRadius: 6, cursor: 'pointer'
+          }}
+        >
+          🔄 Сбросить
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const WELL_TYPES: { key: WellType; label: string; color: string; count: number }[] = [
   { key: 'dob.',   label: 'Добывающие',     color: '#22c55e', count: 2201 },
   { key: 'nagn.',  label: 'Нагнетательные', color: '#3b82f6', count: 784 },
@@ -110,6 +205,8 @@ export default function LayersPanel() {
         >
           {editMode ? '✏️ Редактор: ВКЛ' : '🔒 Редактор графа'}
         </button>
+
+        {editMode && <EditorTools />}
       </div>
     </div>
   )

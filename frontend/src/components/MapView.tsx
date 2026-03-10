@@ -53,6 +53,7 @@ export default function MapView() {
     routePath, setRoutePath, setRouteInfo,
     setSelectedObject,
     markerMode, customMarkers, addCustomMarker,
+    editMode, editSubmode,
   } = useStore()
 
   const [wells, setWells] = useState<any>(null)
@@ -60,6 +61,7 @@ export default function MapView() {
   const [gu, setGu] = useState<any>(null)
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[], edges: [number,number,number][] } | null>(null)
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
+  const [editGraph, setEditGraph] = useState<{ nodes: GraphNode[], edges: [number,number,number][] } | null>(null)
 
   const base = import.meta.env.BASE_URL
 
@@ -71,12 +73,18 @@ export default function MapView() {
       fetch(`${base}data/graph.json`).then(r => r.json()),
     ]).then(([w, b, g, gr]) => {
       setWells(w); setBkns(b); setGu(g)
-      setGraphData({
+      const parsed = {
         nodes: gr.nodes.map(([lat, lon, type]: [number, number, string]) => ({ lat, lon, type })),
-        edges: gr.edges
-      });
+        edges: gr.edges as [number,number,number][]
+      }
+      // Загрузить сохранённые изменения из localStorage
+      const saved = localStorage.getItem('kalamkas_graph')
+      const graph = saved ? JSON.parse(saved) : parsed
+      setGraphData(parsed)
+      setEditGraph({ ...graph })
+      ;(window as any).__KALAMKAS_GRAPH = graph
       // Глобально для RoutePanel поиска
-      (window as any).__KALAMKAS_DATA = { wells: w, bkns: b, gu: g }
+      ;(window as any).__KALAMKAS_DATA = { wells: w, bkns: b, gu: g }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -106,6 +114,13 @@ export default function MapView() {
     (window as any).__BUILD_ROUTE = buildRoute
   }, [from, to, graphData]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Сохранить граф в localStorage
+  const saveGraph = (g: { nodes: GraphNode[], edges: [number,number,number][] }) => {
+    localStorage.setItem('kalamkas_graph', JSON.stringify(g))
+    ;(window as any).__KALAMKAS_GRAPH = g
+    setEditGraph({ ...g })
+  }
+
   const handleMapClick = (lat: number, lon: number) => {
     if (routeSelectMode) {
       const wp = { lat, lon, name: `${lat.toFixed(5)}, ${lon.toFixed(5)}` }
@@ -117,6 +132,30 @@ export default function MapView() {
       addCustomMarker(lat, lon)
       return
     }
+    // Редактор: добавить узел
+    if (editMode && editSubmode === 'add' && editGraph) {
+      const newNode: GraphNode = { lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lon.toFixed(6)), type: 'road' }
+      const updated = { ...editGraph, nodes: [...editGraph.nodes, newNode] }
+      saveGraph(updated)
+    }
+  }
+
+  const handleNodeClick = (idx: number) => {
+    if (!editMode || !editGraph) return
+    if (editSubmode === 'del') {
+      const updated = {
+        nodes: editGraph.nodes.filter((_, i) => i !== idx),
+        edges: editGraph.edges.filter(([f, t]) => f !== idx && t !== idx)
+          .map(([f, t, d]): [number,number,number] => [f > idx ? f - 1 : f, t > idx ? t - 1 : t, d])
+      }
+      saveGraph(updated)
+    }
+  }
+
+  const handleEdgeClick = (edgeIdx: number) => {
+    if (!editMode || editSubmode !== 'deledge' || !editGraph) return
+    const updated = { ...editGraph, edges: editGraph.edges.filter((_, i) => i !== edgeIdx) }
+    saveGraph(updated)
   }
 
   const handleObjectClick = (name: string, type: string, lat: number, lon: number, properties: any) => {
@@ -151,8 +190,50 @@ export default function MapView() {
       <MapClickHandler onMapClick={handleMapClick} />
       <FlyTo target={flyTarget} />
 
-      {/* Дороги */}
-      {layers.roads && roadLines}
+      {/* Дороги (обычный режим) */}
+      {layers.roads && !editMode && roadLines}
+
+      {/* Редактор графа: рёбра */}
+      {editMode && editGraph && editGraph.edges.map(([fromIdx, toIdx], i) => {
+        const a = editGraph.nodes[fromIdx], b = editGraph.nodes[toIdx]
+        if (!a || !b) return null
+        return (
+          <Polyline
+            key={`edge-${i}`}
+            positions={[[a.lat, a.lon], [b.lat, b.lon]]}
+            pathOptions={{
+              color: editSubmode === 'deledge' ? '#f97316' : '#a78bfa',
+              weight: editSubmode === 'deledge' ? 4 : 2,
+              opacity: 0.8
+            }}
+            eventHandlers={{ click: () => handleEdgeClick(i) }}
+          />
+        )
+      })}
+
+      {/* Редактор графа: узлы */}
+      {editMode && editGraph && editGraph.nodes.map((n, i) => {
+        const nodeColor = n.type === 'bkns' ? '#3b82f6' : n.type === 'gu' ? '#f59e0b' : '#a78bfa'
+        return (
+          <CircleMarker
+            key={`node-${i}`}
+            center={[n.lat, n.lon]}
+            radius={editSubmode === 'del' ? 7 : 5}
+            pathOptions={{
+              color: editSubmode === 'del' ? '#ef4444' : nodeColor,
+              fillColor: editSubmode === 'del' ? '#ef4444' : nodeColor,
+              fillOpacity: 0.9, weight: 2
+            }}
+            eventHandlers={{ click: () => handleNodeClick(i) }}
+          >
+            <Popup>
+              Узел #{i}<br/>
+              Тип: {n.type}<br/>
+              {n.lat.toFixed(5)}, {n.lon.toFixed(5)}
+            </Popup>
+          </CircleMarker>
+        )
+      })}
 
       {/* Скважины */}
       {layers.wells && wells?.features
