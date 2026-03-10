@@ -89,10 +89,12 @@ export default function MapView() {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Построение маршрута
+  // Построение маршрута — использует editGraph (с изменениями) если он есть
   const buildRoute = () => {
-    if (!from || !to || !graphData) return
-    const { nodes, edges } = graphData
+    if (!from || !to) return
+    const activeGraph = editGraph || graphData
+    if (!activeGraph) return
+    const { nodes, edges } = activeGraph
     const adj = buildAdj(nodes, edges)
     const startIdx = nearestNode(from.lat, from.lon, nodes)
     const goalIdx = nearestNode(to.lat, to.lon, nodes)
