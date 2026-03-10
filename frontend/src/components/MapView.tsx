@@ -75,7 +75,7 @@ export default function MapView() {
     ]).then(([w, b, g, gr]) => {
       setWells(w); setBkns(b); setGu(g)
       const parsed = {
-        nodes: gr.nodes.map(([lat, lon, type]: [number, number, string]) => ({ lat, lon, type })),
+        nodes: gr.nodes.map((n: any) => Array.isArray(n) ? { lat: n[0], lon: n[1], type: n[2] || "road" } : n) as GraphNode[],
         edges: gr.edges as [number,number,number][]
       }
       // Загрузить сохранённые изменения из localStorage
