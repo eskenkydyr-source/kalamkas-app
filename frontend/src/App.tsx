@@ -1,26 +1,40 @@
 import { useState } from 'react'
 import MapView from './components/MapView'
 import Sidebar from './components/Sidebar'
+import { useStore } from './store/useStore'
 import './App.css'
 
-export type LayersState = Record<string, boolean>
-
 export default function App() {
-  const [activeLayers, setActiveLayers] = useState<LayersState>({
-    wells_dob: true,
-    wells_nagn: true,
-    wells_likv: false,
-    wells_water: false,
-    wells_gaz: false,
-    bkns: true,
-    gu: true,
-    graph: false,
-  })
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const { markerMode, setMarkerMode } = useStore()
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw' }}>
-      <Sidebar activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
-      <MapView activeLayers={activeLayers} />
+    <div className="app">
+      <button
+        className="mob-toggle"
+        onClick={() => setSidebarOpen(v => !v)}
+      >
+        {sidebarOpen ? '✕' : '☰'}
+      </button>
+      <div className={`sidebar-wrap ${sidebarOpen ? 'open' : ''}`}>
+        <Sidebar />
+      </div>
+      <MapView />
+      <div style={{
+        position: 'fixed', bottom: 20, right: 20,
+        display: 'flex', flexDirection: 'column', gap: 8, zIndex: 1000
+      }}>
+        <button
+          onClick={() => setMarkerMode(!markerMode)}
+          title="Поставить метку"
+          style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: markerMode ? '#f59e0b' : '#1e293b',
+            color: '#fff', border: '2px solid ' + (markerMode ? '#f59e0b' : '#334155'),
+            fontSize: 18, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+          }}
+        >📍</button>
+      </div>
     </div>
   )
 }

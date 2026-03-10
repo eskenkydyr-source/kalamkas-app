@@ -1,53 +1,54 @@
-import type { Dispatch, SetStateAction } from 'react'
-import type { LayersState } from '../App'
+import { useStore } from '../store/useStore'
+import LayersPanel from './panels/LayersPanel'
+import RoutePanel from './panels/RoutePanel'
+import ObjectPanel from './panels/ObjectPanel'
 
-interface Props {
-  activeLayers: LayersState
-  setActiveLayers: Dispatch<SetStateAction<LayersState>>
-}
-
-const LAYERS = [
-  { key: 'wells_dob',   label: 'Добывающие',    color: '#22c55e' },
-  { key: 'wells_nagn',  label: 'Нагнетательные', color: '#3b82f6' },
-  { key: 'wells_likv',  label: 'Ликвидированные', color: '#6b7280' },
-  { key: 'wells_water', label: 'Водозаборные',   color: '#06b6d4' },
-  { key: 'wells_gaz',   label: 'Газовые',        color: '#f59e0b' },
-  { key: 'bkns',        label: 'БКНС',           color: '#dc2626' },
-  { key: 'gu',          label: 'ГУ',             color: '#d97706' },
-]
-
-export default function Sidebar({ activeLayers, setActiveLayers }: Props) {
-  const toggle = (key: string) => {
-    setActiveLayers(prev => ({ ...prev, [key]: !prev[key] }))
-  }
+export default function Sidebar() {
+  const { activeTab, setActiveTab } = useStore()
 
   return (
     <div style={{
-      width: 220, background: '#1e293b', color: '#f1f5f9',
-      padding: 16, display: 'flex', flexDirection: 'column', gap: 8,
-      overflowY: 'auto', zIndex: 1000
+      width: '100%', height: '100%',
+      background: '#0f172a',
+      borderRight: '1px solid #1e293b',
+      display: 'flex', flexDirection: 'column',
+      color: '#e2e8f0'
     }}>
-      <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: '#94a3b8' }}>
-        ҚАЛАМҚАС
-      </h2>
-      <p style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>
-        Карта месторождения
-      </p>
+      {/* Заголовок */}
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #1e293b' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', letterSpacing: 1 }}>
+          ҚАЛАМҚАС
+        </div>
+        <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>
+          Карта нефтяного месторождения
+        </div>
+      </div>
 
-      {LAYERS.map(({ key, label, color }) => (
-        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={activeLayers[key] ?? false}
-            onChange={() => toggle(key)}
-          />
-          <span style={{
-            width: 12, height: 12, borderRadius: 2,
-            background: color, flexShrink: 0
-          }} />
-          {label}
-        </label>
-      ))}
+      {/* Вкладки */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1e293b' }}>
+        {(['layers', 'route', 'object'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '8px 4px', fontSize: 11,
+              background: activeTab === tab ? '#1e293b' : 'transparent',
+              color: activeTab === tab ? '#38bdf8' : '#64748b',
+              border: 'none', borderBottom: activeTab === tab ? '2px solid #38bdf8' : '2px solid transparent',
+              cursor: 'pointer', transition: 'all 0.15s'
+            }}
+          >
+            {tab === 'layers' ? '🗂 Слои' : tab === 'route' ? '🗺 Маршрут' : '📍 Объект'}
+          </button>
+        ))}
+      </div>
+
+      {/* Контент вкладки */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {activeTab === 'layers' && <LayersPanel />}
+        {activeTab === 'route' && <RoutePanel />}
+        {activeTab === 'object' && <ObjectPanel />}
+      </div>
     </div>
   )
 }
