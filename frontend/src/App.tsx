@@ -10,17 +10,35 @@ export default function App() {
   const [locating, setLocating] = useState(false)
 
   const goToMyLocation = () => {
-    if (!navigator.geolocation) return alert('GPS недоступен')
+    if (!navigator.geolocation) return alert('GPS недоступен на этом устройстве')
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        ;(window as any).__FLY_TO?.([lat, lng], 16)
-        setLocating(false)
-      },
-      () => { alert('Не удалось получить местоположение'); setLocating(false) },
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      const { latitude: lat, longitude: lng } = pos.coords
+      ;(window as any).__FLY_TO?.([lat, lng], 16)
+      setLocating(false)
+    }
+
+    const onError = (err: GeolocationPositionError) => {
+      setLocating(false)
+      if (err.code === 1) {
+        alert('Доступ к геолокации запрещён.\n\nНа телефоне: Настройки браузера → Разрешения → Местоположение → Разрешить')
+      } else if (err.code === 2) {
+        alert('GPS сигнал недоступен. Попробуй выйти на улицу или включить мобильный интернет.')
+      } else {
+        // Таймаут — пробуем без высокой точности
+        navigator.geolocation.getCurrentPosition(onSuccess, () => {
+          alert('Не удалось определить местоположение. Проверь разрешения в браузере.')
+        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 })
+      }
+    }
+
+    // Сначала пробуем без высокой точности (быстрее на мобильных)
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 30000  // разрешить кэш до 30 сек
+    })
   }
 
   return (

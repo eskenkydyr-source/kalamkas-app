@@ -22,26 +22,38 @@ export default function ObjectPanel() {
   }
 
   const routeFromMe = () => {
-    if (!navigator.geolocation) return alert('GPS недоступен')
+    if (!navigator.geolocation) return alert('GPS недоступен на этом устройстве')
     setRouting(true)
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude: myLat, longitude: myLon } = pos.coords
-        // Показать мою точку на карте
-        ;(window as any).__FLY_TO?.([myLat, myLon])
-        // Установить точки маршрута
-        setFrom({ lat: myLat, lon: myLon, name: 'Моё местоположение' })
-        setTo({ lat, lon, name })
-        // Построить маршрут
-        setTimeout(() => {
-          ;(window as any).__BUILD_ROUTE?.()
-          setActiveTab('route')
-        }, 100)
-        setRouting(false)
-      },
-      () => { alert('Не удалось получить местоположение'); setRouting(false) },
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      const { latitude: myLat, longitude: myLon } = pos.coords
+      ;(window as any).__FLY_TO?.([myLat, myLon])
+      setFrom({ lat: myLat, lon: myLon, name: 'Моё местоположение' })
+      setTo({ lat, lon, name })
+      setTimeout(() => {
+        ;(window as any).__BUILD_ROUTE?.()
+        setActiveTab('route')
+      }, 100)
+      setRouting(false)
+    }
+
+    const onError = (err: GeolocationPositionError) => {
+      setRouting(false)
+      if (err.code === 1) {
+        alert('Доступ к геолокации запрещён.\n\nНа телефоне: Настройки браузера → Разрешения → Местоположение → Разрешить')
+      } else {
+        // Таймаут или нет сигнала — пробуем без точного GPS
+        navigator.geolocation.getCurrentPosition(onSuccess, () => {
+          alert('Не удалось определить местоположение. Проверь разрешения в браузере.')
+        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 })
+      }
+    }
+
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 30000
+    })
   }
 
   return (

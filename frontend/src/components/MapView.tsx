@@ -60,19 +60,19 @@ function InitialPosition() {
         return
       } catch {}
     }
-    // 2. GPS
+    // 2. GPS — без высокой точности, с кэшем (быстрее на мобильных)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => {
           const { latitude: lat, longitude: lng } = pos.coords
-          // Проверить что координаты в пределах месторождения (±0.5 градуса)
           if (Math.abs(lat - 45.374) < 0.5 && Math.abs(lng - 51.926) < 0.5) {
             map.setView([lat, lng], 15, { animate: true })
           } else {
             map.setView([lat, lng], 13, { animate: true })
           }
         },
-        () => {} // GPS недоступен — остаёмся на дефолте
+        () => {}, // GPS недоступен — остаёмся на дефолте
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
       )
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
