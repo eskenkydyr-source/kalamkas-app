@@ -2,14 +2,15 @@ import { useStore } from '../../store/useStore'
 import type { WellType } from '../../store/useStore'
 
 const SUBMODES = [
-  { key: 'add'     as const, icon: '➕', label: 'Добавить узел', hint: 'Клик на карте — добавить узел дороги' },
-  { key: 'move'    as const, icon: '✋', label: 'Перемещение',   hint: 'Перетащите узел на новое место' },
-  { key: 'del'     as const, icon: '🗑', label: 'Удалить узел',  hint: 'Клик на узле — удалить его' },
-  { key: 'deledge' as const, icon: '✂️', label: 'Удалить ребро', hint: 'Клик на дороге — удалить связь' },
+  { key: 'add'     as const, icon: '➕', label: 'Узел',        hint: 'Клик на карте — добавить узел дороги' },
+  { key: 'move'    as const, icon: '✋', label: 'Переместить', hint: '① Клик на узле → ② Клик на новом месте' },
+  { key: 'addedge' as const, icon: '🔗', label: 'Ребро',       hint: '① Клик на 1-м узле → ② Клик на 2-м узле' },
+  { key: 'del'     as const, icon: '🗑', label: 'Уд.узел',     hint: 'Клик на узле — удалить его и все рёбра' },
+  { key: 'deledge' as const, icon: '✂️', label: 'Уд.ребро',   hint: 'Клик на линии — удалить эту связь' },
 ]
 
 function EditorTools() {
-  const { editSubmode, setEditSubmode } = useStore()
+  const { editSubmode, setEditSubmode, selectedNodeIdx } = useStore()
 
   const exportGraph = () => {
     const data = (window as any).__KALAMKAS_GRAPH
@@ -32,6 +33,7 @@ function EditorTools() {
   }
 
   const activeHint = SUBMODES.find(s => s.key === editSubmode)?.hint
+  const needsNodeSelect = editSubmode === 'move' || editSubmode === 'addedge'
 
   return (
     <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -60,6 +62,7 @@ function EditorTools() {
         ))}
       </div>
 
+      {/* Подсказка */}
       {activeHint && (
         <div style={{
           background: '#1e293b', border: '1px solid #334155',
@@ -67,6 +70,22 @@ function EditorTools() {
           fontSize: 11, color: '#94a3b8', lineHeight: 1.4
         }}>
           💡 {activeHint}
+        </div>
+      )}
+
+      {/* Статус выбранного узла */}
+      {needsNodeSelect && (
+        <div style={{
+          background: selectedNodeIdx !== null ? '#14532d' : '#1c1917',
+          border: '1px solid ' + (selectedNodeIdx !== null ? '#166534' : '#44403c'),
+          borderRadius: 6, padding: '6px 8px',
+          fontSize: 11, color: selectedNodeIdx !== null ? '#86efac' : '#78716c',
+          textAlign: 'center'
+        }}>
+          {selectedNodeIdx !== null
+            ? `✅ Узел #${selectedNodeIdx} выбран — кликни ${editSubmode === 'move' ? 'на новое место' : 'на второй узел'}`
+            : `👆 Кликни на узел (фиолетовый кружок)`
+          }
         </div>
       )}
 

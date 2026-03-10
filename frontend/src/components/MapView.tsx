@@ -54,6 +54,7 @@ export default function MapView() {
     setSelectedObject,
     markerMode, customMarkers, addCustomMarker,
     editMode, editSubmode,
+    selectedNodeIdx, setSelectedNodeIdx,
   } = useStore()
 
   const [wells, setWells] = useState<any>(null)
@@ -137,22 +138,66 @@ export default function MapView() {
       const newNode: GraphNode = { lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lon.toFixed(6)), type: 'road' }
       const updated = { ...editGraph, nodes: [...editGraph.nodes, newNode] }
       saveGraph(updated)
+      return
+    }
+    // Редактор: переместить узел — 2й клик (новое место)
+    if (editMode && editSubmode === 'move' && selectedNodeIdx !== null && editGraph) {
+      const nodes = editGraph.nodes.map((n, i) =>
+        i === selectedNodeIdx ? { ...n, lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lon.toFixed(6)) } : n
+      )
+      saveGraph({ ...editGraph, nodes })
+      setSelectedNodeIdx(null)
+      return
     }
   }
 
-  const handleNodeClick = (idx: number) => {
+  const handleNodeClick = (idx: number, e?: any) => {
+    if (e) e.originalEvent?.stopPropagation?.()
     if (!editMode || !editGraph) return
+
+    // Удалить узел
     if (editSubmode === 'del') {
       const updated = {
         nodes: editGraph.nodes.filter((_, i) => i !== idx),
-        edges: editGraph.edges.filter(([f, t]) => f !== idx && t !== idx)
+        edges: editGraph.edges
+          .filter(([f, t]) => f !== idx && t !== idx)
           .map(([f, t, d]): [number,number,number] => [f > idx ? f - 1 : f, t > idx ? t - 1 : t, d])
       }
       saveGraph(updated)
+      setSelectedNodeIdx(null)
+      return
+    }
+
+    // Переместить — 1й клик: выбрать узел
+    if (editSubmode === 'move') {
+      setSelectedNodeIdx(selectedNodeIdx === idx ? null : idx)
+      return
+    }
+
+    // Добавить ребро
+    if (editSubmode === 'addedge') {
+      if (selectedNodeIdx === null) {
+        setSelectedNodeIdx(idx)
+      } else if (selectedNodeIdx !== idx) {
+        const a = editGraph.nodes[selectedNodeIdx]
+        const b = editGraph.nodes[idx]
+        const dist = Math.round(haversine(a.lat, a.lon, b.lat, b.lon))
+        // Проверить что ребро ещё не существует
+        const exists = editGraph.edges.some(
+          ([f, t]) => (f === selectedNodeIdx && t === idx) || (f === idx && t === selectedNodeIdx)
+        )
+        if (!exists) {
+          const newEdge: [number,number,number] = [selectedNodeIdx, idx, dist]
+          saveGraph({ ...editGraph, edges: [...editGraph.edges, newEdge] })
+        }
+        setSelectedNodeIdx(null)
+      }
+      return
     }
   }
 
-  const handleEdgeClick = (edgeIdx: number) => {
+  const handleEdgeClick = (edgeIdx: number, e?: any) => {
+    if (e) e.originalEvent?.stopPropagation?.()
     if (!editMode || editSubmode !== 'deledge' || !editGraph) return
     const updated = { ...editGraph, edges: editGraph.edges.filter((_, i) => i !== edgeIdx) }
     saveGraph(updated)
@@ -206,29 +251,29 @@ export default function MapView() {
               weight: editSubmode === 'deledge' ? 4 : 2,
               opacity: 0.8
             }}
-            eventHandlers={{ click: () => handleEdgeClick(i) }}
+            eventHandlers={{ click: (e) => handleEdgeClick(i, e) }}
           />
         )
       })}
 
       {/* Редактор графа: узлы */}
       {editMode && editGraph && editGraph.nodes.map((n, i) => {
-        const nodeColor = n.type === 'bkns' ? '#3b82f6' : n.type === 'gu' ? '#f59e0b' : '#a78bfa'
+        const isSelected = selectedNodeIdx === i
+        const baseColor = n.type === 'bkns' ? '#3b82f6' : n.type === 'gu' ? '#f59e0b' : '#a78bfa'
+        const color = editSubmode === 'del' ? '#ef4444'
+          : isSelected ? '#22c55e'
+          : baseColor
+        const radius = isSelected ? 10 : editSubmode === 'del' ? 7 : 5
         return (
           <CircleMarker
             key={`node-${i}`}
             center={[n.lat, n.lon]}
-            radius={editSubmode === 'del' ? 7 : 5}
-            pathOptions={{
-              color: editSubmode === 'del' ? '#ef4444' : nodeColor,
-              fillColor: editSubmode === 'del' ? '#ef4444' : nodeColor,
-              fillOpacity: 0.9, weight: 2
-            }}
-            eventHandlers={{ click: () => handleNodeClick(i) }}
+            radius={radius}
+            pathOptions={{ color, fillColor: color, fillOpacity: 0.9, weight: isSelected ? 3 : 2 }}
+            eventHandlers={{ click: (e) => handleNodeClick(i, e) }}
           >
             <Popup>
-              Узел #{i}<br/>
-              Тип: {n.type}<br/>
+              Узел #{i} ({n.type})<br/>
               {n.lat.toFixed(5)}, {n.lon.toFixed(5)}
             </Popup>
           </CircleMarker>
