@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import type { WellType } from '../../store/useStore'
 
@@ -11,6 +12,71 @@ const SUBMODES = [
 
 function EditorTools() {
   const { editSubmode, setEditSubmode, selectedNodeIdx } = useStore()
+
+  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'ok' | 'err'>('idle')
+
+  const GITHUB_REPO = 'eskenkydyr-source/kalamkas-app'
+  const GITHUB_FILE = 'data/graph.json'
+  const GITHUB_BRANCH = 'gh-pages'
+
+  const saveToCloud = async () => {
+    const data = (window as any).__KALAMKAS_GRAPH
+    if (!data) return alert('Граф не загружен')
+
+    // Получить или запросить токен
+    let token = localStorage.getItem('gh_token')
+    if (!token) {
+      token = prompt(
+        'Введите GitHub Personal Access Token (нужен для сохранения на все устройства).\n\n' +
+        'Получить: github.com → Settings → Developer settings → Personal access tokens → Fine-grained → Contents: Read & Write\n\n' +
+        'Токен сохранится в браузере и больше не понадобится.'
+      )
+      if (!token) return
+      localStorage.setItem('gh_token', token)
+    }
+
+    setSaving(true)
+    setSaveStatus('idle')
+    try {
+      // Получить текущий SHA файла
+      const headRes = await fetch(
+        `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}?ref=${GITHUB_BRANCH}`,
+        { headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json' } }
+      )
+      if (!headRes.ok) throw new Error(`GitHub API: ${headRes.status}`)
+      const { sha } = await headRes.json()
+
+      // Кодировать в base64
+      const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))))
+
+      // Обновить файл
+      const putRes = await fetch(
+        `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `graph: save changes ${new Date().toISOString().slice(0,16)}`,
+            content, sha,
+            branch: GITHUB_BRANCH
+          })
+        }
+      )
+      if (!putRes.ok) {
+        const err = await putRes.json()
+        if (putRes.status === 401) { localStorage.removeItem('gh_token'); throw new Error('Неверный токен, попробуй снова') }
+        throw new Error(err.message || putRes.status)
+      }
+      setSaveStatus('ok')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    } catch (e: any) {
+      alert('Ошибка сохранения: ' + e.message)
+      setSaveStatus('err')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const exportGraph = () => {
     const data = (window as any).__KALAMKAS_GRAPH
@@ -89,7 +155,23 @@ function EditorTools() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+      {/* Сохранить в облако */}
+      <button
+        onClick={saveToCloud}
+        disabled={saving}
+        style={{
+          width: '100%', padding: '8px', fontSize: 12, fontWeight: 600,
+          background: saveStatus === 'ok' ? '#14532d' : saving ? '#1e3a5f' : '#1d4ed8',
+          color: saveStatus === 'ok' ? '#86efac' : '#fff',
+          border: '1px solid ' + (saveStatus === 'ok' ? '#166534' : '#2563eb'),
+          borderRadius: 6, cursor: saving ? 'wait' : 'pointer',
+          transition: 'all 0.2s'
+        }}
+      >
+        {saving ? '⏳ Сохраняю...' : saveStatus === 'ok' ? '✅ Сохранено на всех устройствах' : '☁️ Сохранить на все устройства'}
+      </button>
+
+      <div style={{ display: 'flex', gap: 4 }}>
         <button
           onClick={exportGraph}
           style={{
