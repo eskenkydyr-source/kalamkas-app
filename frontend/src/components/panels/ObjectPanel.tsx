@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useStore } from '../../store/useStore'
 
 export default function ObjectPanel() {
   const { selectedObject, setFrom, setTo, setActiveTab } = useStore()
+  const [routing, setRouting] = useState(false)
 
   if (!selectedObject) {
     return (
@@ -17,6 +19,29 @@ export default function ObjectPanel() {
     const wp = { lat, lon, name }
     which === 'from' ? setFrom(wp) : setTo(wp)
     setActiveTab('route')
+  }
+
+  const routeFromMe = () => {
+    if (!navigator.geolocation) return alert('GPS недоступен')
+    setRouting(true)
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: myLat, longitude: myLon } = pos.coords
+        // Показать мою точку на карте
+        ;(window as any).__FLY_TO?.([myLat, myLon])
+        // Установить точки маршрута
+        setFrom({ lat: myLat, lon: myLon, name: 'Моё местоположение' })
+        setTo({ lat, lon, name })
+        // Построить маршрут
+        setTimeout(() => {
+          ;(window as any).__BUILD_ROUTE?.()
+          setActiveTab('route')
+        }, 100)
+        setRouting(false)
+      },
+      () => { alert('Не удалось получить местоположение'); setRouting(false) },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
   }
 
   return (
@@ -42,7 +67,23 @@ export default function ObjectPanel() {
         }
       </div>
 
-      {/* Кнопки маршрута */}
+      {/* Маршрут от меня */}
+      <button
+        onClick={routeFromMe}
+        disabled={routing}
+        style={{
+          width: '100%', padding: '9px', fontSize: 13, fontWeight: 600,
+          marginBottom: 8,
+          background: routing ? '#1e3a5f' : '#1d4ed8',
+          color: '#fff', border: 'none', borderRadius: 6,
+          cursor: routing ? 'wait' : 'pointer',
+          boxShadow: '0 2px 6px rgba(29,78,216,0.4)'
+        }}
+      >
+        {routing ? '⏳ Определяю местоположение...' : '🎯 Маршрут от меня сюда'}
+      </button>
+
+      {/* Кнопки откуда/куда */}
       <div style={{ display: 'flex', gap: 6 }}>
         <button
           onClick={() => setAsRoute('from')}

@@ -108,6 +108,7 @@ export default function MapView() {
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[], edges: [number,number,number][] } | null>(null)
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
   const [editGraph, setEditGraph] = useState<{ nodes: GraphNode[], edges: [number,number,number][] } | null>(null)
+  const [myLocation, setMyLocation] = useState<[number, number] | null>(null)
 
   const base = import.meta.env.BASE_URL
 
@@ -157,10 +158,19 @@ export default function MapView() {
     setRouteInfo({ distance: dist, duration: (dist / 1000) / 30 * 60 })
   }
 
-  // Глобально доступна для RoutePanel
+  // Глобально доступна для RoutePanel и App
   useEffect(() => {
     (window as any).__BUILD_ROUTE = buildRoute
-  }, [from, to, graphData]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [from, to, graphData, editGraph]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // __FLY_TO — перелёт карты из App.tsx (кнопка 🎯)
+  useEffect(() => {
+    (window as any).__FLY_TO = (coords: [number, number], _zoom?: number) => {
+      setMyLocation(coords)
+      setFlyTarget(coords)
+    }
+    return () => { delete (window as any).__FLY_TO }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Сохранить граф в localStorage
   const saveGraph = (g: { nodes: GraphNode[], edges: [number,number,number][] }) => {
@@ -397,6 +407,31 @@ export default function MapView() {
           pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }}>
           <Popup>{to.name}</Popup>
         </CircleMarker>
+      )}
+
+      {/* Моё местоположение — синяя точка */}
+      {myLocation && (
+        <>
+          <CircleMarker center={myLocation} radius={10}
+            pathOptions={{ color: '#fff', fillColor: '#3b82f6', fillOpacity: 1, weight: 2 }}>
+            <Popup>
+              📡 Моё местоположение<br/>
+              {myLocation[0].toFixed(5)}, {myLocation[1].toFixed(5)}<br/>
+              <button
+                onClick={() => {
+                  setFrom({ lat: myLocation[0], lon: myLocation[1], name: 'Моё местоположение' })
+                  ;(window as any).__BUILD_ROUTE?.()
+                }}
+                style={{ marginTop: 6, padding: '4px 8px', fontSize: 11, background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', width: '100%' }}
+              >
+                🗺 Маршрут отсюда
+              </button>
+            </Popup>
+          </CircleMarker>
+          {/* Пульсирующий круг */}
+          <CircleMarker center={myLocation} radius={18}
+            pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1.5, dashArray: '4,3' }} />
+        </>
       )}
 
       {/* Пользовательские метки */}
