@@ -9,35 +9,60 @@ export default function App() {
   const { markerMode, setMarkerMode } = useStore()
   const [locating, setLocating] = useState(false)
 
+  const [locMsg, setLocMsg] = useState('')
+
+  const applyLocation = (lat: number, lng: number) => {
+    ;(window as any).__FLY_TO?.([lat, lng], 16)
+    ;(window as any).__SET_MY_LOCATION?.([lat, lng])
+    setLocating(false)
+    setLocMsg('')
+  }
+
+  // Запасной вариант — IP геолокация (не требует разрешений)
+  const locateByIP = async () => {
+    setLocMsg('📡 Определяю по IP...')
+    try {
+      const res = await fetch('https://ipapi.co/json/')
+      const data = await res.json()
+      if (data.latitude && data.longitude) {
+        applyLocation(data.latitude, data.longitude)
+      } else throw new Error('no data')
+    } catch {
+      setLocating(false)
+      setLocMsg('')
+      alert('Не удалось определить местоположение ни через GPS, ни через IP.')
+    }
+  }
+
   const goToMyLocation = () => {
-    if (!navigator.geolocation) return alert('GPS недоступен на этом устройстве')
     setLocating(true)
+    setLocMsg('🔍 Определяю местоположение...')
+
+    if (!navigator.geolocation) {
+      locateByIP()
+      return
+    }
 
     const onSuccess = (pos: GeolocationPosition) => {
-      const { latitude: lat, longitude: lng } = pos.coords
-      ;(window as any).__FLY_TO?.([lat, lng], 16)
-      setLocating(false)
+      applyLocation(pos.coords.latitude, pos.coords.longitude)
     }
 
     const onError = (err: GeolocationPositionError) => {
-      setLocating(false)
       if (err.code === 1) {
-        alert('Доступ к геолокации запрещён.\n\nНа телефоне: Настройки браузера → Разрешения → Местоположение → Разрешить')
-      } else if (err.code === 2) {
-        alert('GPS сигнал недоступен. Попробуй выйти на улицу или включить мобильный интернет.')
+        // Разрешение запрещено — сразу IP
+        setLocMsg('🌐 GPS запрещён, пробую IP...')
+        locateByIP()
       } else {
-        // Таймаут — пробуем без высокой точности
-        navigator.geolocation.getCurrentPosition(onSuccess, () => {
-          alert('Не удалось определить местоположение. Проверь разрешения в браузере.')
-        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 })
+        // Таймаут или нет сигнала — IP
+        setLocMsg('⏱ GPS недоступен, пробую IP...')
+        locateByIP()
       }
     }
 
-    // Сначала пробуем без высокой точности (быстрее на мобильных)
     navigator.geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: false,
-      timeout: 15000,
-      maximumAge: 30000  // разрешить кэш до 30 сек
+      timeout: 8000,
+      maximumAge: 60000
     })
   }
 
@@ -56,6 +81,19 @@ export default function App() {
         position: 'fixed', bottom: 20, right: 20,
         display: 'flex', flexDirection: 'column', gap: 8, zIndex: 1000
       }}>
+        {/* Статус геолокации */}
+        {locMsg && (
+          <div style={{
+            position: 'absolute', right: 52, whiteSpace: 'nowrap',
+            background: '#1e293b', color: '#94a3b8',
+            border: '1px solid #334155', borderRadius: 8,
+            padding: '6px 10px', fontSize: 11,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+          }}>
+            {locMsg}
+          </div>
+        )}
+
         {/* Моё местоположение */}
         <button
           onClick={goToMyLocation}
@@ -64,8 +102,7 @@ export default function App() {
             width: 44, height: 44, borderRadius: '50%',
             background: locating ? '#1d4ed8' : '#1e293b',
             color: '#fff', border: '2px solid ' + (locating ? '#3b82f6' : '#334155'),
-            fontSize: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            animation: locating ? 'pulse 1s infinite' : 'none'
+            fontSize: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
           }}
         >
           {locating ? '⏳' : '🎯'}

@@ -163,13 +163,18 @@ export default function MapView() {
     (window as any).__BUILD_ROUTE = buildRoute
   }, [from, to, graphData, editGraph]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // __FLY_TO — перелёт карты из App.tsx (кнопка 🎯)
+  // __FLY_TO и __SET_MY_LOCATION — вызываются из App.tsx (кнопка 🎯)
   useEffect(() => {
     (window as any).__FLY_TO = (coords: [number, number], _zoom?: number) => {
-      setMyLocation(coords)
       setFlyTarget(coords)
     }
-    return () => { delete (window as any).__FLY_TO }
+    (window as any).__SET_MY_LOCATION = (coords: [number, number]) => {
+      setMyLocation(coords)
+    }
+    return () => {
+      delete (window as any).__FLY_TO
+      delete (window as any).__SET_MY_LOCATION
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Сохранить граф в localStorage

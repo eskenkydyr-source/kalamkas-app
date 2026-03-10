@@ -21,39 +21,41 @@ export default function ObjectPanel() {
     setActiveTab('route')
   }
 
+  const applyMyLocation = (myLat: number, myLon: number) => {
+    ;(window as any).__FLY_TO?.([myLat, myLon])
+    ;(window as any).__SET_MY_LOCATION?.([myLat, myLon])
+    setFrom({ lat: myLat, lon: myLon, name: 'Моё местоположение' })
+    setTo({ lat, lon, name })
+    setTimeout(() => {
+      ;(window as any).__BUILD_ROUTE?.()
+      setActiveTab('route')
+    }, 150)
+    setRouting(false)
+  }
+
   const routeFromMe = () => {
-    if (!navigator.geolocation) return alert('GPS недоступен на этом устройстве')
     setRouting(true)
 
-    const onSuccess = (pos: GeolocationPosition) => {
-      const { latitude: myLat, longitude: myLon } = pos.coords
-      ;(window as any).__FLY_TO?.([myLat, myLon])
-      setFrom({ lat: myLat, lon: myLon, name: 'Моё местоположение' })
-      setTo({ lat, lon, name })
-      setTimeout(() => {
-        ;(window as any).__BUILD_ROUTE?.()
-        setActiveTab('route')
-      }, 100)
-      setRouting(false)
+    const tryGPS = () => {
+      if (!navigator.geolocation) { tryIP(); return }
+      navigator.geolocation.getCurrentPosition(
+        pos => applyMyLocation(pos.coords.latitude, pos.coords.longitude),
+        () => tryIP(),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      )
     }
 
-    const onError = (err: GeolocationPositionError) => {
-      setRouting(false)
-      if (err.code === 1) {
-        alert('Доступ к геолокации запрещён.\n\nНа телефоне: Настройки браузера → Разрешения → Местоположение → Разрешить')
-      } else {
-        // Таймаут или нет сигнала — пробуем без точного GPS
-        navigator.geolocation.getCurrentPosition(onSuccess, () => {
-          alert('Не удалось определить местоположение. Проверь разрешения в браузере.')
-        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 })
-      }
+    const tryIP = () => {
+      fetch('https://ipapi.co/json/')
+        .then(r => r.json())
+        .then(d => {
+          if (d.latitude) applyMyLocation(d.latitude, d.longitude)
+          else { setRouting(false); alert('Не удалось определить местоположение') }
+        })
+        .catch(() => { setRouting(false); alert('Не удалось определить местоположение') })
     }
 
-    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: false,
-      timeout: 15000,
-      maximumAge: 30000
-    })
+    tryGPS()
   }
 
   return (
