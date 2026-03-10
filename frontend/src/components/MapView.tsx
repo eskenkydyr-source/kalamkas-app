@@ -34,6 +34,51 @@ function FlyTo({ target }: { target: [number, number] | null }) {
   return null
 }
 
+// Сохраняет позицию карты в localStorage при каждом движении
+function PositionSaver() {
+  const map = useMap()
+  useMapEvents({
+    moveend() {
+      const c = map.getCenter()
+      const z = map.getZoom()
+      localStorage.setItem('map_pos', JSON.stringify({ lat: c.lat, lon: c.lng, zoom: z }))
+    }
+  })
+  return null
+}
+
+// При первом открытии: GPS → сохранённая позиция → центр месторождения
+function InitialPosition() {
+  const map = useMap()
+  useEffect(() => {
+    // 1. Попробовать сохранённую позицию
+    const saved = localStorage.getItem('map_pos')
+    if (saved) {
+      try {
+        const { lat, lon, zoom } = JSON.parse(saved)
+        map.setView([lat, lon], zoom, { animate: false })
+        return
+      } catch {}
+    }
+    // 2. GPS
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const { latitude: lat, longitude: lng } = pos.coords
+          // Проверить что координаты в пределах месторождения (±0.5 градуса)
+          if (Math.abs(lat - 45.374) < 0.5 && Math.abs(lng - 51.926) < 0.5) {
+            map.setView([lat, lng], 15, { animate: true })
+          } else {
+            map.setView([lat, lng], 13, { animate: true })
+          }
+        },
+        () => {} // GPS недоступен — остаёмся на дефолте
+      )
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return null
+}
+
 // Компонент для смены базовой карты
 function BasemapLayer({ basemap }: { basemap: string }) {
   return (
@@ -236,6 +281,8 @@ export default function MapView() {
       <BasemapLayer basemap={basemap} />
       <MapClickHandler onMapClick={handleMapClick} />
       <FlyTo target={flyTarget} />
+      <PositionSaver />
+      <InitialPosition />
 
       {/* Дороги (обычный режим) */}
       {layers.roads && !editMode && roadLines}
