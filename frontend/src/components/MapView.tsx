@@ -112,8 +112,8 @@ export default function MapView() {
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null)
   // Режим "Цепочка": индекс последнего добавленного узла
   const [chainLastIdx, setChainLastIdx] = useState<number | null>(null)
-  // Режим "Отрезок": первая точка
-  const [segmentStart, setSegmentStart] = useState<{ lat: number; lon: number } | null>(null)
+  // Режим "Отрезок": первая точка (existingIdx — если начато с существующего узла)
+  const [segmentStart, setSegmentStart] = useState<{ lat: number; lon: number; existingIdx?: number } | null>(null)
 
   const base = import.meta.env.BASE_URL
 
@@ -249,9 +249,15 @@ export default function MapView() {
       const n = Math.max(1, Math.round(totalDist / segmentStep))
       const newNodes = [...editGraph.nodes]
       const newEdges = [...editGraph.edges]
-      // Создаём начальный узел
-      newNodes.push({ lat: parseFloat(sLat.toFixed(6)), lon: parseFloat(sLon.toFixed(6)), type: 'road' })
-      let prevIdx = newNodes.length - 1
+      let prevIdx: number
+      if (segmentStart.existingIdx !== undefined) {
+        // Начало с существующего узла — не создаём новый
+        prevIdx = segmentStart.existingIdx
+      } else {
+        // Начало с пустого места — создаём начальный узел
+        newNodes.push({ lat: parseFloat(sLat.toFixed(6)), lon: parseFloat(sLon.toFixed(6)), type: 'road' })
+        prevIdx = newNodes.length - 1
+      }
       // Промежуточные + конечный узел
       for (let i = 1; i <= n; i++) {
         const t = i / n
@@ -275,6 +281,19 @@ export default function MapView() {
   const handleNodeClick = (idx: number, e?: any) => {
     if (e) e.originalEvent?.stopPropagation?.()
     if (!editMode || !editGraph) return
+
+    // Цепочка: клик на существующий узел = начать/продолжить цепочку с него
+    if (editSubmode === 'chain') {
+      setChainLastIdx(idx)
+      return
+    }
+
+    // Отрезок: клик на существующий узел = задать его как начало отрезка
+    if (editSubmode === 'segment') {
+      const n = editGraph.nodes[idx]
+      setSegmentStart({ lat: n.lat, lon: n.lon, existingIdx: idx })
+      return
+    }
 
     // Удалить узел
     if (editSubmode === 'del') {

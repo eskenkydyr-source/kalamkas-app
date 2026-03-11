@@ -3,8 +3,8 @@ import { useStore } from '../../store/useStore'
 import type { WellType } from '../../store/useStore'
 
 const SUBMODES = [
-  { key: 'chain'   as const, icon: '⛓', label: 'Цепочка',     hint: 'Каждый клик = узел + авторебро к предыдущему. Нажми "Стоп цепочки" чтобы начать новую' },
-  { key: 'segment' as const, icon: '📏', label: 'Отрезок',     hint: '① Клик = начало, ② Клик = конец → узлы расставятся автоматически через N метров' },
+  { key: 'chain'   as const, icon: '⛓', label: 'Цепочка',     hint: 'Клик на пустое место = новый узел. Клик на существующий узел = продолжить цепочку оттуда' },
+  { key: 'segment' as const, icon: '📏', label: 'Отрезок',     hint: 'Клик на пустое место или существующий узел = начало. ② Клик = конец → узлы через N метров' },
   { key: 'add'     as const, icon: '➕', label: 'Узел',        hint: 'Клик на карте — добавить один узел' },
   { key: 'move'    as const, icon: '✋', label: 'Переместить', hint: '① Клик на узле → ② Клик на новом месте' },
   { key: 'addedge' as const, icon: '🔗', label: 'Ребро',       hint: '① Клик на 1-м узле → ② Клик на 2-м узле' },
