@@ -3,15 +3,24 @@ import { useStore } from '../../store/useStore'
 import type { WellType } from '../../store/useStore'
 
 const SUBMODES = [
-  { key: 'add'     as const, icon: '➕', label: 'Узел',        hint: 'Клик на карте — добавить узел дороги' },
+  { key: 'chain'   as const, icon: '⛓', label: 'Цепочка',     hint: 'Каждый клик = узел + авторебро к предыдущему. Нажми "Стоп цепочки" чтобы начать новую' },
+  { key: 'segment' as const, icon: '📏', label: 'Отрезок',     hint: '① Клик = начало, ② Клик = конец → узлы расставятся автоматически через N метров' },
+  { key: 'add'     as const, icon: '➕', label: 'Узел',        hint: 'Клик на карте — добавить один узел' },
   { key: 'move'    as const, icon: '✋', label: 'Переместить', hint: '① Клик на узле → ② Клик на новом месте' },
   { key: 'addedge' as const, icon: '🔗', label: 'Ребро',       hint: '① Клик на 1-м узле → ② Клик на 2-м узле' },
   { key: 'del'     as const, icon: '🗑', label: 'Уд.узел',     hint: 'Клик на узле — удалить его и все рёбра' },
   { key: 'deledge' as const, icon: '✂️', label: 'Уд.ребро',   hint: 'Клик на линии — удалить эту связь' },
 ]
 
+const SEGMENT_STEPS = [
+  { value: 50,  label: '50 м' },
+  { value: 100, label: '100 м' },
+  { value: 200, label: '200 м' },
+  { value: 500, label: '500 м' },
+]
+
 function EditorTools() {
-  const { editSubmode, setEditSubmode, selectedNodeIdx } = useStore()
+  const { editSubmode, setEditSubmode, selectedNodeIdx, segmentStep, setSegmentStep } = useStore()
 
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'ok' | 'err'>('idle')
@@ -136,6 +145,44 @@ function EditorTools() {
           fontSize: 11, color: '#94a3b8', lineHeight: 1.4
         }}>
           💡 {activeHint}
+        </div>
+      )}
+
+      {/* Режим "Цепочка": кнопка завершения */}
+      {editSubmode === 'chain' && (
+        <button
+          onClick={() => setEditSubmode('chain')} // переключение сбрасывает chainLastIdx через useEffect в MapView
+          style={{
+            padding: '6px 8px', fontSize: 11, fontWeight: 600,
+            background: '#7c2d12', color: '#fdba74',
+            border: '1px solid #9a3412', borderRadius: 6, cursor: 'pointer'
+          }}
+        >
+          ⏹ Начать новую цепочку
+        </button>
+      )}
+
+      {/* Режим "Отрезок": выбор шага */}
+      {editSubmode === 'segment' && (
+        <div>
+          <div style={{ fontSize: 10, color: '#475569', marginBottom: 4 }}>Шаг между узлами:</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {SEGMENT_STEPS.map(s => (
+              <button
+                key={s.value}
+                onClick={() => setSegmentStep(s.value)}
+                style={{
+                  flex: 1, padding: '5px 2px', fontSize: 10,
+                  background: segmentStep === s.value ? '#0369a1' : '#1e293b',
+                  color: segmentStep === s.value ? '#fff' : '#94a3b8',
+                  border: '1px solid ' + (segmentStep === s.value ? '#0ea5e9' : '#334155'),
+                  borderRadius: 4, cursor: 'pointer'
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

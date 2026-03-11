@@ -100,6 +100,7 @@ export default function MapView() {
     markerMode, customMarkers, addCustomMarker,
     editMode, editSubmode,
     selectedNodeIdx, setSelectedNodeIdx,
+    segmentStep,
   } = useStore()
 
   const [wells, setWells] = useState<any>(null)
@@ -109,6 +110,10 @@ export default function MapView() {
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
   const [editGraph, setEditGraph] = useState<{ nodes: GraphNode[], edges: [number,number,number][] } | null>(null)
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null)
+  // Режим "Цепочка": индекс последнего добавленного узла
+  const [chainLastIdx, setChainLastIdx] = useState<number | null>(null)
+  // Режим "Отрезок": первая точка
+  const [segmentStart, setSegmentStart] = useState<{ lat: number; lon: number } | null>(null)
 
   const base = import.meta.env.BASE_URL
 
@@ -163,6 +168,12 @@ export default function MapView() {
     (window as any).__BUILD_ROUTE = buildRoute
   }, [from, to, graphData, editGraph]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Сбросить временные состояния редактора при смене режима
+  useEffect(() => {
+    setChainLastIdx(null)
+    setSegmentStart(null)
+  }, [editSubmode])
+
   // __FLY_TO и __SET_MY_LOCATION — вызываются из App.tsx (кнопка 🎯)
   useEffect(() => {
     (window as any).__FLY_TO = (coords: [number, number], _zoom?: number) => {
@@ -209,6 +220,54 @@ export default function MapView() {
       )
       saveGraph({ ...editGraph, nodes })
       setSelectedNodeIdx(null)
+      return
+    }
+    // Режим "Цепочка": каждый клик = новый узел + ребро к предыдущему
+    if (editMode && editSubmode === 'chain' && editGraph) {
+      const newNode: GraphNode = { lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lon.toFixed(6)), type: 'road' }
+      const newNodes = [...editGraph.nodes, newNode]
+      const newIdx = newNodes.length - 1
+      const newEdges = [...editGraph.edges]
+      if (chainLastIdx !== null) {
+        const prev = newNodes[chainLastIdx]
+        const dist = Math.round(haversine(prev.lat, prev.lon, newNode.lat, newNode.lon))
+        newEdges.push([chainLastIdx, newIdx, dist])
+      }
+      saveGraph({ ...editGraph, nodes: newNodes, edges: newEdges })
+      setChainLastIdx(newIdx)
+      return
+    }
+    // Режим "Отрезок": клик 1 = начало, клик 2 = конец → автоузлы через segmentStep метров
+    if (editMode && editSubmode === 'segment' && editGraph) {
+      if (!segmentStart) {
+        setSegmentStart({ lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lon.toFixed(6)) })
+        return
+      }
+      // Второй клик: расставляем узлы вдоль прямой
+      const { lat: sLat, lon: sLon } = segmentStart
+      const totalDist = haversine(sLat, sLon, lat, lon)
+      const n = Math.max(1, Math.round(totalDist / segmentStep))
+      const newNodes = [...editGraph.nodes]
+      const newEdges = [...editGraph.edges]
+      // Создаём начальный узел
+      newNodes.push({ lat: parseFloat(sLat.toFixed(6)), lon: parseFloat(sLon.toFixed(6)), type: 'road' })
+      let prevIdx = newNodes.length - 1
+      // Промежуточные + конечный узел
+      for (let i = 1; i <= n; i++) {
+        const t = i / n
+        const node: GraphNode = {
+          lat: parseFloat((sLat + t * (lat - sLat)).toFixed(6)),
+          lon: parseFloat((sLon + t * (lon - sLon)).toFixed(6)),
+          type: 'road',
+        }
+        newNodes.push(node)
+        const currIdx = newNodes.length - 1
+        const dist = Math.round(haversine(newNodes[prevIdx].lat, newNodes[prevIdx].lon, node.lat, node.lon))
+        newEdges.push([prevIdx, currIdx, dist])
+        prevIdx = currIdx
+      }
+      saveGraph({ ...editGraph, nodes: newNodes, edges: newEdges })
+      setSegmentStart(null) // готов к следующему отрезку
       return
     }
   }
@@ -412,6 +471,27 @@ export default function MapView() {
           pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }}>
           <Popup>{to.name}</Popup>
         </CircleMarker>
+      )}
+
+      {/* Режим "Отрезок": маркер начальной точки */}
+      {editMode && editSubmode === 'segment' && segmentStart && (
+        <>
+          <CircleMarker center={[segmentStart.lat, segmentStart.lon]} radius={10}
+            pathOptions={{ color: '#fff', fillColor: '#f97316', fillOpacity: 1, weight: 2 }}>
+            <Popup>Начало отрезка<br/>Кликни на конечную точку</Popup>
+          </CircleMarker>
+          <CircleMarker center={[segmentStart.lat, segmentStart.lon]} radius={18}
+            pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.15, weight: 1.5, dashArray: '4,3' }} />
+        </>
+      )}
+
+      {/* Режим "Цепочка": выделить последний узел */}
+      {editMode && editSubmode === 'chain' && chainLastIdx !== null && editGraph?.nodes[chainLastIdx] && (
+        <CircleMarker
+          center={[editGraph.nodes[chainLastIdx].lat, editGraph.nodes[chainLastIdx].lon]}
+          radius={12}
+          pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.4, weight: 2.5, dashArray: '4,3' }}
+        />
       )}
 
       {/* Моё местоположение — синяя точка */}

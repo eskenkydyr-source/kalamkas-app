@@ -43,11 +43,14 @@ interface Store {
   // Редактор графа
   editMode: boolean
   setEditMode: (v: boolean) => void
-  editSubmode: 'move' | 'add' | 'del' | 'deledge' | 'addedge'
-  setEditSubmode: (m: 'move' | 'add' | 'del' | 'deledge' | 'addedge') => void
+  editSubmode: 'move' | 'add' | 'del' | 'deledge' | 'addedge' | 'chain' | 'segment'
+  setEditSubmode: (m: 'move' | 'add' | 'del' | 'deledge' | 'addedge' | 'chain' | 'segment') => void
   // Выбранный узел для перемещения или соединения ребром
   selectedNodeIdx: number | null
   setSelectedNodeIdx: (i: number | null) => void
+  // Шаг между узлами в режиме "Отрезок" (метры)
+  segmentStep: number
+  setSegmentStep: (n: number) => void
 
   // Активная вкладка
   activeTab: 'layers' | 'route' | 'object'
@@ -99,6 +102,8 @@ export const useStore = create<Store>((set, _get) => ({
   setEditSubmode: (m) => set({ editSubmode: m, selectedNodeIdx: null }),
   selectedNodeIdx: null,
   setSelectedNodeIdx: (i) => set({ selectedNodeIdx: i }),
+  segmentStep: 100,
+  setSegmentStep: (n) => set({ segmentStep: n }),
 
   activeTab: 'layers',
   setActiveTab: (t) => set({ activeTab: t }),
