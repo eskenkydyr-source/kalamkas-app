@@ -41,18 +41,36 @@ export default function ObjectPanel() {
       navigator.geolocation.getCurrentPosition(
         pos => applyMyLocation(pos.coords.latitude, pos.coords.longitude),
         () => tryIP(),
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
       )
     }
 
-    const tryIP = () => {
-      fetch('https://ipapi.co/json/')
-        .then(r => r.json())
-        .then(d => {
-          if (d.latitude) applyMyLocation(d.latitude, d.longitude)
-          else { setRouting(false); alert('Не удалось определить местоположение') }
-        })
-        .catch(() => { setRouting(false); alert('Не удалось определить местоположение') })
+    const tryIP = async () => {
+      const services = [
+        async () => {
+          const r = await fetch('https://ipinfo.io/json', { signal: AbortSignal.timeout(5000) })
+          const d = await r.json()
+          if (d.loc) { const [lat, lon] = d.loc.split(',').map(Number); return { lat, lon } }
+          throw new Error('no loc')
+        },
+        async () => {
+          const r = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) })
+          const d = await r.json()
+          if (d.latitude) return { lat: d.latitude, lon: d.longitude }
+          throw new Error('no data')
+        },
+        async () => {
+          const r = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(5000) })
+          const d = await r.json()
+          if (d.latitude) return { lat: d.latitude, lon: d.longitude }
+          throw new Error('no data')
+        },
+      ]
+      for (const service of services) {
+        try { const { lat, lon } = await service(); applyMyLocation(lat, lon); return } catch {}
+      }
+      setRouting(false)
+      alert('Не удалось определить местоположение')
     }
 
     tryGPS()

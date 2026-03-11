@@ -21,17 +21,40 @@ export default function App() {
   // Запасной вариант — IP геолокация (не требует разрешений)
   const locateByIP = async () => {
     setLocMsg('📡 Определяю по IP...')
-    try {
-      const res = await fetch('https://ipapi.co/json/')
-      const data = await res.json()
-      if (data.latitude && data.longitude) {
-        applyLocation(data.latitude, data.longitude)
-      } else throw new Error('no data')
-    } catch {
-      setLocating(false)
-      setLocMsg('')
-      alert('Не удалось определить местоположение ни через GPS, ни через IP.')
+    // Пробуем несколько сервисов по очереди
+    const services = [
+      async () => {
+        const r = await fetch('https://ipinfo.io/json', { signal: AbortSignal.timeout(5000) })
+        const d = await r.json()
+        if (d.loc) {
+          const [lat, lon] = d.loc.split(',').map(Number)
+          return { lat, lon }
+        }
+        throw new Error('no loc')
+      },
+      async () => {
+        const r = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) })
+        const d = await r.json()
+        if (d.latitude) return { lat: d.latitude, lon: d.longitude }
+        throw new Error('no data')
+      },
+      async () => {
+        const r = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(5000) })
+        const d = await r.json()
+        if (d.latitude) return { lat: d.latitude, lon: d.longitude }
+        throw new Error('no data')
+      },
+    ]
+    for (const service of services) {
+      try {
+        const { lat, lon } = await service()
+        applyLocation(lat, lon)
+        return
+      } catch { /* пробуем следующий */ }
     }
+    setLocating(false)
+    setLocMsg('')
+    alert('Не удалось определить местоположение. Проверьте интернет-соединение.')
   }
 
   const goToMyLocation = () => {
@@ -61,8 +84,8 @@ export default function App() {
 
     navigator.geolocation.getCurrentPosition(onSuccess, onError, {
       enableHighAccuracy: false,
-      timeout: 8000,
-      maximumAge: 60000
+      timeout: 5000,
+      maximumAge: 300000
     })
   }
 
