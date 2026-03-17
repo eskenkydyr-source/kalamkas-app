@@ -282,16 +282,67 @@ export default function MapView() {
     if (e) e.originalEvent?.stopPropagation?.()
     if (!editMode || !editGraph) return
 
-    // Цепочка: клик на существующий узел = начать/продолжить цепочку с него
+    // Цепочка: клик на существующий узел = соединить с предыдущим и продолжить цепочку с него
     if (editSubmode === 'chain') {
+      if (chainLastIdx !== null && chainLastIdx !== idx) {
+        const a = editGraph.nodes[chainLastIdx]
+        const b = editGraph.nodes[idx]
+        const dist = Math.round(haversine(a.lat, a.lon, b.lat, b.lon))
+        const exists = editGraph.edges.some(
+          ([f, t]) => (f === chainLastIdx && t === idx) || (f === idx && t === chainLastIdx)
+        )
+        if (!exists) {
+          saveGraph({ ...editGraph, edges: [...editGraph.edges, [chainLastIdx, idx, dist]] })
+        }
+      }
       setChainLastIdx(idx)
       return
     }
 
-    // Отрезок: клик на существующий узел = задать его как начало отрезка
+    // Отрезок: клик на существующий узел = начало или конец отрезка
     if (editSubmode === 'segment') {
-      const n = editGraph.nodes[idx]
-      setSegmentStart({ lat: n.lat, lon: n.lon, existingIdx: idx })
+      const nodeData = editGraph.nodes[idx]
+      if (!segmentStart) {
+        // Первый клик — начало с существующего узла
+        setSegmentStart({ lat: nodeData.lat, lon: nodeData.lon, existingIdx: idx })
+      } else {
+        // Второй клик на существующий узел — конец отрезка, снэпаем к нему
+        const { lat: sLat, lon: sLon } = segmentStart
+        const endLat = nodeData.lat, endLon = nodeData.lon
+        const totalDist = haversine(sLat, sLon, endLat, endLon)
+        const steps = Math.max(1, Math.round(totalDist / segmentStep))
+        const newNodes = [...editGraph.nodes]
+        const newEdges = [...editGraph.edges]
+        let prevIdx: number
+        if (segmentStart.existingIdx !== undefined) {
+          prevIdx = segmentStart.existingIdx
+        } else {
+          newNodes.push({ lat: parseFloat(sLat.toFixed(6)), lon: parseFloat(sLon.toFixed(6)), type: 'road' })
+          prevIdx = newNodes.length - 1
+        }
+        // Промежуточные узлы (без конечного — он уже существует)
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps
+          const node: GraphNode = {
+            lat: parseFloat((sLat + t * (endLat - sLat)).toFixed(6)),
+            lon: parseFloat((sLon + t * (endLon - sLon)).toFixed(6)),
+            type: 'road',
+          }
+          newNodes.push(node)
+          const currIdx = newNodes.length - 1
+          const dist = Math.round(haversine(newNodes[prevIdx].lat, newNodes[prevIdx].lon, node.lat, node.lon))
+          newEdges.push([prevIdx, currIdx, dist])
+          prevIdx = currIdx
+        }
+        // Соединить последний промежуточный (или начало) с существующим конечным узлом
+        const distToEnd = Math.round(haversine(newNodes[prevIdx].lat, newNodes[prevIdx].lon, endLat, endLon))
+        const endExists = newEdges.some(([f, t]) => (f === prevIdx && t === idx) || (f === idx && t === prevIdx))
+        if (!endExists) {
+          newEdges.push([prevIdx, idx, distToEnd])
+        }
+        saveGraph({ nodes: newNodes, edges: newEdges })
+        setSegmentStart(null)
+      }
       return
     }
 
