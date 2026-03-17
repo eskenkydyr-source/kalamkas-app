@@ -147,8 +147,8 @@ export default function MapView() {
     if (!activeGraph) return
     const { nodes, edges } = activeGraph
     const adj = buildAdj(nodes, edges)
-    const startIdx = nearestNode(from.lat, from.lon, nodes)
-    const goalIdx = nearestNode(to.lat, to.lon, nodes)
+    const startIdx = nearestNode(from.lat, from.lon, nodes, Infinity)
+    const goalIdx = nearestNode(to.lat, to.lon, nodes, Infinity)
     if (startIdx === null || goalIdx === null) { setRoutePath([]); return }
     const path = astar(startIdx, goalIdx, nodes, adj)
     if (!path) { setRoutePath([]); return }
